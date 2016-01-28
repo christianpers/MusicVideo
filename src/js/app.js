@@ -39,7 +39,7 @@ Math.easeOutExpo = function (t, b, c, d) {
 		window.NS.GL = {};
 		window.NS.GL.params = {};
 		window.NS.GL.params.width = 70;
-		window.NS.GL.params.height = 40;
+		window.NS.GL.params.height = 60;
 		window.NS.GL.params.depth = 60;
 
 		// this._scene = new SceneApp();

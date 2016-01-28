@@ -27,12 +27,14 @@ p.init = function(){
 
 	gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
 	gl.enable(gl.DEPTH_TEST);
+	gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
     // gl.enable(gl.CULL_FACE);
-	gl.enable(gl.BLEND);
+	// gl.enable(gl.BLEND);
 	gl.clearColor( 0, 0, 0, 1 );
 	gl.clearDepth( 1 );
 	this.depthTextureExt 	= gl.getExtension("WEBKIT_WEBGL_depth_texture"); // Or browser-appropriate prefix
 	// this.floatTextureExt 	= gl.getExtension("OES_texture_float") // Or browser-appropriate prefix
+	this.deravitives = gl.getExtension("GL_OES_standard_derivatives");
 	
 
 	this._setCamera();

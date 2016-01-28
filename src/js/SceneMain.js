@@ -7,9 +7,12 @@ var ViewRoof = require('./views/ViewRoof');
 var ViewFloor = require('./views/ViewFloor');
 var ViewVideo = require('./views/ViewVideo');
 var ViewPrism = require('./views/ViewPrism');
+var ViewBlur = require('./views/ViewBlur');
+var ViewLamp = require('./views/ViewLamp');
 var ViewLeftWall = require('./views/ViewLeftWall');
 var ViewPlain = require('./views/ViewPlain');
 var ViewBackground = require('./views/ViewBackground');
+var ViewLed = require('./views/ViewLed');
 var ViewImport = require('./views/ViewImport');
 var Scene = require('./framework/Scene');
 var KeyboardInteractor = require('./interaction/KeyboardInteractor');
@@ -330,11 +333,24 @@ p._initTextures = function() {
 	this.fboSize.w = window.innerWidth * 2;
 	this.fboSize.h = window.innerHeight * 2;
 
+	this.fboSizeLed = {};
+	this.fboSizeLed.w = 2;
+	this.fboSizeLed.h = window.innerHeight;
+
 	this._leftWallFBO = new Framebuffer();
 	this._leftWallFBO.init(this.fboSize.w/2, this.fboSize.h/2, gl.NEAREST, gl.NEAREST, gl.UNSIGNED_BYTE);
 
 	this._prismFBO = new Framebuffer();
 	this._prismFBO.init(this.fboSize.w, this.fboSize.h, gl.NEAREST, gl.NEAREST, gl.UNSIGNED_BYTE);
+
+	this._ledFBO = new Framebuffer();
+	this._ledFBO.init(this.fboSizeLed.w, this.fboSizeLed.h, gl.NEAREST, gl.NEAREST, gl.UNSIGNED_BYTE);
+
+	this._blurVFBO = new Framebuffer();
+	this._blurVFBO.init(this.fboSizeLed.w, this.fboSizeLed.h, gl.NEAREST, gl.NEAREST, gl.UNSIGNED_BYTE);
+
+	this._blurHFBO = new Framebuffer();
+	this._blurHFBO.init(this.fboSizeLed.w, this.fboSizeLed.h, gl.NEAREST, gl.NEAREST, gl.UNSIGNED_BYTE);
 	
 	
 
@@ -355,22 +371,34 @@ p._initViews = function() {
 	this._vCopy.init(glslify("../shaders/copy.vert"), glslify("../shaders/copy.frag"));
 	this._vCopy.transforms = this.orthoTransforms;
 
+	this._vBlurVert = new ViewBlur();
+	this._vBlurVert.init(glslify("../shaders/copy.vert"), glslify("../shaders/verticalGaussianBlur.frag"));
+	this._vBlurVert.transforms = this.orthoTransforms;
+
+	this._vBlurHoriz = new ViewBlur();
+	this._vBlurHoriz.init(glslify("../shaders/copy.vert"), glslify("../shaders/horizontalGaussianBlur.frag"));
+	this._vBlurHoriz.transforms = this.orthoTransforms;
 
 	this._vWalls = new ViewWalls();
 	this._vWalls.init(glslify("../shaders/room.vert"), glslify("../shaders/walls.frag"));
 	this._vWalls.transforms = this.transforms;
-	// this._views.push(this._vWalls);
-
+	
 	this._vRoof = new ViewRoof();
 	this._vRoof.init(glslify("../shaders/room.vert"), glslify("../shaders/roof.frag"));
 	this._vRoof.transforms = this.transforms;
-	// this._views.push(this._vRoof);
-
+	
 	this._vFloor = new ViewFloor();
 	this._vFloor.init(glslify("../shaders/room.vert"), glslify("../shaders/floor.frag"));
 	this._vFloor.transforms = this.transforms;
-	// this._views.push(this._vFloor);
 
+	this._vLed = new ViewLed();
+	this._vLed.init(glslify("../shaders/led.vert"), glslify("../shaders/led.frag"));
+	this._vLed.transforms = this.orthoTransforms;
+
+	this._vLamp = new ViewLamp();
+	this._vLamp.init(glslify("../shaders/lamp.vert"), glslify("../shaders/lamp.frag"));
+	this._vLamp.transforms = this.transforms;
+	
 // 		var gui = new dat.GUI({load: {
 //   "preset": "Default",
 //   "closed": false,
@@ -455,6 +483,10 @@ p.render = function() {
 
 	// debugger;
 
+	gl.enable(gl.DEPTH_TEST);
+
+	gl.disable(gl.BLEND);
+
 	this.endScreen.render();
 	this.loaderScreen.render();
 
@@ -495,6 +527,8 @@ p.render = function() {
 			
 			this._videoTexture.updateTexture(this.videoPlayer.video);
 
+
+
 			this.leftWallTransforms.push();
 			
 			this.leftWallTransforms.setCamera(this.leftWallCamera);
@@ -511,7 +545,7 @@ p.render = function() {
 
 			this._leftWallFBO.unbind();
 
-			//render prism with wall texture
+			// render prism with wall texture
 			this._prismFBO.bind();
 
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -523,8 +557,32 @@ p.render = function() {
 			this.leftWallTransforms.pop();
 
 			
+			this.orthoTransforms.setCamera(this.orthoCamera);
+			this._ledFBO.bind();
+			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+			
+
+			this._vLed.render();
 
 
+			this._ledFBO.unbind();
+
+			this._blurVFBO.bind();
+			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+			this._vBlurVert.render(this._ledFBO.getTexture());
+
+			this._blurVFBO.unbind();
+
+			this._blurHFBO.bind();
+			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+			this._vBlurHoriz.render(this._blurVFBO.getTexture());
+
+			this._blurHFBO.unbind();
+
+
+			// this._vCopy.render(this._blurHFBO.getTexture(), this.fboSizeLed);
 
 			// this.orthoTransforms.setCamera(this.orthoCamera);
 
@@ -532,12 +590,15 @@ p.render = function() {
 
 
 
-			// Render visible scene
+			// // Render visible scene
 			this._vWalls.render(this._prismFBO.getTexture(), this.fboSize);
 			// // // this._vRoom.render(this._prismFBO.getTexture(), this._concreteTexture);
 
 			this._vVideo.render(this._videoTexture);
 
+
+
+			
 			// console.log(this.audioData);
 			// debugger;
 			this._vFloor.render(this._prismFBO.getTexture(), this._concreteTexture, this.audioData, this.fboSize);
@@ -546,13 +607,21 @@ p.render = function() {
 
 			this._vCircle.render(this._leftWallFBO.getTexture(), this.audioData);
 
+			// gl.disable(gl.DEPTH_TEST);
+
+
+            gl.enable(gl.BLEND);
+            gl.disable(gl.DEPTH_TEST);
+
+			this._vLamp.render(this._blurHFBO.getTexture());
+
 			// debugger;
 			// this._vTestImport.render(this._concreteTexture, this.audioData);
 
 		}
 	}else{
 		this.orthoTransforms.setCamera(this.orthoCamera);
-		this._vBackground.render(this._permTexture, this._simplexTexture, this._concreteTexture, this.backgroundLoaderFader);
+		// this._vBackground.render(this._permTexture, this._simplexTexture, this._concreteTexture, this.backgroundLoaderFader);
 	}
 		
 	this.transforms.pop();
